@@ -24,7 +24,7 @@ class MainActivity : BaseActivity() {
     override fun initView() = with(binding) {
         initObservers()
 
-        userViewModel.getUserList()
+//        userViewModel.getUserList()
 
         binding.recyclerViewUsers.apply {
             adapter = UserListAdapter()
