@@ -1,15 +1,16 @@
 package com.picpay.desafio.android.presentation.user
 
-import com.picpay.desafio.android.presentation.user.viewModels.UserViewModel
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.picpay.desafio.android.R
 import com.picpay.desafio.android.databinding.ActivityMainBinding
-import com.picpay.desafio.android.domain.model.UserModel
 import com.picpay.desafio.android.presentation.hide
-import com.picpay.desafio.android.presentation.user.adapters.UserListAdapter
 import com.picpay.desafio.android.presentation.show
+import com.picpay.desafio.android.presentation.user.adapters.UserListAdapter
+import com.picpay.desafio.android.presentation.user.model.UserDiffCallback
+import com.picpay.desafio.android.presentation.user.viewModels.UserViewModel
 import com.picpay.desafio.android.presentation.viewBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -21,37 +22,39 @@ class MainActivity : BaseActivity() {
 
     private val userViewModel: UserViewModel by viewModel()
 
-    override fun initView() = with(binding) {
-        initObservers()
-
-//        userViewModel.getUserList()
-
-        binding.recyclerViewUsers.apply {
-            adapter = UserListAdapter()
-            layoutManager = LinearLayoutManager(this@MainActivity)
-        }
-        userListProgressBar.show()
-    }
-
-    private fun initObservers() =
-        with(userViewModel) {
-            onGetUsersError.observe(this@MainActivity) { errorSignatureState() }
+    override fun initView() {
+        with(binding) {
+            val userListAdapter = UserListAdapter(UserDiffCallback())
+            recyclerViewUsers.adapter = userListAdapter
+            recyclerViewUsers.layoutManager = LinearLayoutManager(this@MainActivity)
 
             lifecycleScope.launch {
-                onGetUsersSuccess.collectLatest { data ->
-                    successSignatureState(data)
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    userViewModel.uiState.collectLatest { state ->
+                        when (state) {
+                            is UiState.Loading -> {
+                                userListProgressBar.show()
+                                recyclerViewUsers.hide()
+                            }
+
+                            is UiState.Success -> {
+                                userListProgressBar.hide()
+                                recyclerViewUsers.show()
+                                userListAdapter.submitList(state.value)
+                            }
+
+                            is UiState.Error -> {
+                                userListProgressBar.hide()
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "$state.error",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
                 }
             }
         }
-
-    private fun errorSignatureState() = with(binding) {
-        userListProgressBar.hide()
-        binding.recyclerViewUsers.hide()
-        Toast.makeText(this@MainActivity, getString(R.string.error), Toast.LENGTH_SHORT).show()
-    }
-
-    private fun successSignatureState(data: List<UserModel>) = with(binding) {
-        userListProgressBar.hide()
-        (binding.recyclerViewUsers.adapter as UserListAdapter).users = data
     }
 }
